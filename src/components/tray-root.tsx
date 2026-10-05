@@ -63,6 +63,11 @@ const TrayRoot: React.FC<ITrayRootProps> = ({
   }, []);
 
   const [originTag, setOriginTag] = useState<number>(NO_ORIGIN_TAG);
+  // Native code hides a morph trigger while the tray is open, but React Native
+  // re-applies the opacity prop when the trigger re-lays out. Mirror the hiding
+  // in JS once presented: earlier, it would race the native snapshot on open.
+  const [originHidden, setOriginHidden] = useState(false);
+  const onDidPresent = useCallback(() => setOriginHidden(true), []);
 
   const [fullScreenRequested, setFullScreen] = useState(false);
   const [fullScreenViews, setFullScreenViews] = useState<string[]>([]);
@@ -77,6 +82,7 @@ const TrayRoot: React.FC<ITrayRootProps> = ({
 
   const onDidClose = useCallback(() => {
     setOriginTag(NO_ORIGIN_TAG);
+    setOriginHidden(false);
     setFullScreen(false);
     if (!resetOnClose || initialView === undefined) {
       return;
@@ -112,8 +118,10 @@ const TrayRoot: React.FC<ITrayRootProps> = ({
       springs,
       registerDefaultView,
       registerFullScreenViews,
+      onDidPresent,
       onDidClose,
       originTag,
+      originHidden,
       setOriginTag,
     }),
     [
@@ -130,8 +138,10 @@ const TrayRoot: React.FC<ITrayRootProps> = ({
       springs,
       registerDefaultView,
       registerFullScreenViews,
+      onDidPresent,
       onDidClose,
       originTag,
+      originHidden,
     ]
   );
 

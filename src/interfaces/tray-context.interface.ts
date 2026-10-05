@@ -8,8 +8,10 @@ interface ITrayContext extends ITrayState {
   springs: IResolvedTrayAnimation;
   registerDefaultView: (view: string) => void;
   registerFullScreenViews: (names: string[]) => void;
+  onDidPresent: () => void;
   onDidClose: () => void;
   originTag: number;
+  originHidden: boolean;
   setOriginTag: (tag: number) => void;
 }
 
