@@ -447,6 +447,10 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     val colors = ArgbEvaluator()
     val fromBackdrop = backdrop.alpha
 
+    // Re-capture the trigger: its contents may have changed while the tray was open. Then hide it
+    // again, since a React re-render while open can have restored its opacity.
+    MorphletSnapshot.recordContents(origin)?.let { originSnapshot = it }
+    origin.alpha = 0f
     card.translationY = 0f
     card.alpha = 1f
     card.snapshot = originSnapshot

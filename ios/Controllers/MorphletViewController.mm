@@ -598,6 +598,15 @@
 
   CGRect frame = [self restingFrameOfOriginView:origin];
   _originRadius = [self cornerRadiusOfOriginView:origin inFrame:frame];
+  // Re-capture the trigger: its contents may have changed while the tray was open. Then hide it
+  // again, since a React re-render while open can have restored its opacity.
+  origin.alpha = _originAlpha;
+  UIImageView *fresh = MorphletContentSnapshotImageView(origin);
+  origin.alpha = 0;
+  if (fresh) {
+    [_originSnapshot removeFromSuperview];
+    _originSnapshot = fresh;
+  }
   UIView *snapshot = _originSnapshot;
   UIView *cover = _coverView;
   UIColor *originColor = _originColor;
