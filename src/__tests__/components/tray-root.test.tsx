@@ -1,12 +1,9 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { Tray, useTray } from '../../root';
 import { containerViews, hostView } from '../helpers/native';
-
-// The test renderer has no native tags; give morph triggers one.
-jest.mock('../../utils/origin.utils', () => ({ resolveOriginTag: () => 7 }));
 
 const Basic = (props: Parameters<typeof Tray.Root>[0]) => (
   <Tray.Root {...props}>
@@ -106,34 +103,5 @@ describe('Tray.Root', () => {
     expect(() => render(<Orphan />)).toThrow(
       '<useTray> must be used within <Tray.Root>.'
     );
-  });
-
-  it('keeps a morph trigger hidden from presented until dismissed', () => {
-    render(
-      <Tray.Root>
-        <Tray.Trigger morph testID="trigger">
-          <Text>Open</Text>
-        </Tray.Trigger>
-        <Tray.Content>
-          <Tray.Close>
-            <Text>Close</Text>
-          </Tray.Close>
-        </Tray.Content>
-      </Tray.Root>
-    );
-    const opacity = () =>
-      StyleSheet.flatten(screen.getByTestId('trigger').props.style)?.opacity;
-
-    fireEvent.press(screen.getByText('Open'));
-    expect(opacity()).toBeUndefined();
-
-    act(() => hostView().props.onDidPresent());
-    expect(opacity()).toBe(0);
-
-    fireEvent.press(screen.getByText('Close'));
-    expect(opacity()).toBe(0);
-
-    act(() => hostView().props.onDidDismiss());
-    expect(opacity()).toBeUndefined();
   });
 });

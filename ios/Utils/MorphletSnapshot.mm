@@ -61,7 +61,17 @@ static void MorphletCollectEffectViews(UIView *view, NSMutableArray<UIVisualEffe
   }
 }
 
+static void MorphletDisplayIfNeeded(CALayer *layer) {
+  [layer displayIfNeeded];
+  for (CALayer *sublayer in layer.sublayers) {
+    MorphletDisplayIfNeeded(sublayer);
+  }
+}
+
 UIImageView *_Nullable MorphletContentSnapshotImageView(UIView *view) {
+  [view layoutIfNeeded];
+  MorphletDisplayIfNeeded(view.layer);
+
   NSMutableArray<CALayer *> *fills = [NSMutableArray array];
   NSMutableArray *colors = [NSMutableArray array];
   for (UIView *surface in MorphletSurfaceChain(view)) {
@@ -277,6 +287,23 @@ static UIColor *_Nullable MorphletGlassTint(NSArray<UIView *> *chain) {
         tint = [tint resolvedColorWithTraitCollection:surface.traitCollection];
         return [tint colorWithAlphaComponent:CGColorGetAlpha(tint.CGColor) * MorphletSurfaceOpacity(chain, surface)];
       }
+    }
+  }
+  return nil;
+}
+
+UIColor *_Nullable MorphletOpaqueBackgroundColor(UIView *view) {
+  NSArray<UIView *> *chain = MorphletSurfaceChain(view);
+  if (MorphletGlassTint(chain)) {
+    return nil;
+  }
+  for (UIView *surface in chain.reverseObjectEnumerator) {
+    CALayer *fillLayer = MorphletBackgroundLayer(surface);
+    if (fillLayer) {
+      CGFloat opacity = MorphletSurfaceOpacity(chain, surface);
+      return CGColorGetAlpha(fillLayer.backgroundColor) * opacity >= 0.999
+               ? [UIColor colorWithCGColor:fillLayer.backgroundColor]
+               : nil;
     }
   }
   return nil;

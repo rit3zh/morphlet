@@ -22,5 +22,6 @@ NSArray<UIView *> *MorphletSurfaceChain(UIView *view);
 CGFloat MorphletCornerRadius(UIView *view);
 
 UIColor *MorphletVisibleBackgroundColor(UIView *view, UIColor *fallback);
+UIColor *_Nullable MorphletOpaqueBackgroundColor(UIView *view);
 
 NS_ASSUME_NONNULL_END

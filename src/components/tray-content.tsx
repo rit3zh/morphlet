@@ -47,15 +47,7 @@ const TrayContent: React.FC<ITrayContentProps> = ({
   ...rest
 }: ITrayContentProps): React.JSX.Element | null => {
   const context = useTrayContext(COMPONENT_NAMES.CONTENT);
-  const {
-    open,
-    setOpen,
-    onDidPresent: onTrayDidPresent,
-    onDidClose,
-    duration,
-    originTag,
-    springs,
-  } = context;
+  const { open, setOpen, onDidClose, duration, originTag, springs } = context;
   const fullScreen = fullScreenProp ?? context.fullScreen;
 
   const windowDimensions = useWindowDimensions();
@@ -140,10 +132,7 @@ const TrayContent: React.FC<ITrayContentProps> = ({
           setOpen(false);
         }
       }}
-      onDidPresent={() => {
-        onTrayDidPresent();
-        onDidPresent?.();
-      }}
+      onDidPresent={onDidPresent}
       onDidDismiss={() => {
         if (!openRef.current) {
           setIsRendered(false);

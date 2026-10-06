@@ -28,6 +28,7 @@ export default function RootLayout() {
         <Stack.Screen name="game" />
         <Stack.Screen name="collections" />
         <Stack.Screen name="playground" />
+        <Stack.Screen name="picker" />
       </Stack>
     </>
   );

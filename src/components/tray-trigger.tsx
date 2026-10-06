@@ -12,8 +12,9 @@ const TrayTrigger: React.FC<ITrayTriggerProps> = ({
   morph = false,
   ...props
 }: ITrayTriggerProps): React.ReactElement => {
-  const { open, setOpen, originTag, originHidden, setOriginTag } =
-    useTrayContext(COMPONENT_NAMES.TRIGGER);
+  const { open, setOpen, setOriginTag } = useTrayContext(
+    COMPONENT_NAMES.TRIGGER
+  );
   const hostRef = useRef<THostRef>(null);
 
   return renderTrayPressable(
@@ -26,8 +27,7 @@ const TrayTrigger: React.FC<ITrayTriggerProps> = ({
       }
       setOpen(!open);
     },
-    hostRef,
-    morph && originHidden && originTag !== NO_ORIGIN_TAG
+    hostRef
   );
 };
 

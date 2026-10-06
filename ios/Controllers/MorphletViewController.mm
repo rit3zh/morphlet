@@ -40,7 +40,10 @@
 
 - (void)dealloc {
   [NSNotificationCenter.defaultCenter removeObserver:self];
-  _morphedOriginView.alpha = _originAlpha;
+  _morphedOriginView.hidden = NO;
+  if (_originAlpha >= 0) {
+    _morphedOriginView.alpha = _originAlpha;
+  }
 }
 
 #pragma mark - View
@@ -274,7 +277,13 @@
 }
 
 - (void)applyCardGeometryAnimated:(BOOL)animated {
-  if (!self.isViewLoaded || _isMorphing || _presentationState == MorphletPresentationStateDismissing) {
+  if (!self.isViewLoaded || _presentationState == MorphletPresentationStateDismissing) {
+    return;
+  }
+  if (_isMorphing) {
+    if (_presentationState == MorphletPresentationStatePresenting && _cardAnimator) {
+      [self endMorphInEarly];
+    }
     return;
   }
 
@@ -406,7 +415,7 @@
 - (void)prepareMorphFromOrigin:(UIView *)origin {
   _isMorphing = YES;
   _morphedOriginView = origin;
-  _originAlpha = origin.alpha > 0.01 ? origin.alpha : 1;
+  _originAlpha = -1;
 
   CGRect frame = [self frameOfOriginView:origin];
   _originColor = MorphletVisibleBackgroundColor(origin, [self resolvedCardColor]);
@@ -425,7 +434,7 @@
   _coverView.backgroundColor = _originColor;
   _coverView.alpha = 1;
 
-  origin.alpha = 0;
+  origin.hidden = YES;
 }
 
 - (void)animateIn {
@@ -503,6 +512,19 @@
   [reveal startAnimationAfterDelay:0.04];
 }
 
+- (void)endMorphInEarly {
+  [self interruptCardAnimation];
+
+  UIView *backdrop = _backdropView;
+  CGFloat backdropAlpha = _stackDepth > 0 ? 0 : _backdropOpacity;
+  [MorphletSpring animateWithSpring:self.morphSpring.withoutBounce
+                           velocity:0
+                         animations:^{
+                           backdrop.alpha = backdropAlpha;
+                         }
+                         completion:nil];
+}
+
 - (void)settleAfterMorphIn {
   CGRect target = [self targetCardFrame];
   CGSize size = _cardView.bounds.size;
@@ -574,7 +596,12 @@
   CGFloat target = [self offscreenOffset];
   CGFloat distance = MAX(1, target - current);
   UIView *hiddenOrigin = _morphedOriginView;
-  CGFloat originAlpha = _originAlpha;
+  CGFloat originAlpha = hiddenOrigin.alpha;
+  if (hiddenOrigin.hidden) {
+    _originAlpha = originAlpha;
+    hiddenOrigin.alpha = 0;
+    hiddenOrigin.hidden = NO;
+  }
 
   __weak __typeof(self) weakSelf = self;
   _cardAnimator = [MorphletSpring animateWithSpring:self.dismissSpring
@@ -598,15 +625,14 @@
 
   CGRect frame = [self restingFrameOfOriginView:origin];
   _originRadius = [self cornerRadiusOfOriginView:origin inFrame:frame];
-  // Re-capture the trigger: its contents may have changed while the tray was open. Then hide it
-  // again, since a React re-render while open can have restored its opacity.
-  origin.alpha = _originAlpha;
+  origin.hidden = NO;
   UIImageView *fresh = MorphletContentSnapshotImageView(origin);
-  origin.alpha = 0;
+  origin.hidden = YES;
   if (fresh) {
     [_originSnapshot removeFromSuperview];
     _originSnapshot = fresh;
   }
+  _originColor = MorphletOpaqueBackgroundColor(origin) ?: _originColor;
   UIView *snapshot = _originSnapshot;
   UIView *cover = _coverView;
   UIColor *originColor = _originColor;
@@ -656,7 +682,7 @@
   if (_presentationState != MorphletPresentationStateDismissing) {
     return;
   }
-  origin.alpha = _originAlpha;
+  origin.hidden = NO;
 
   UIView *card = _cardView;
   __weak __typeof(self) weakSelf = self;
@@ -699,7 +725,11 @@
   _isMorphing = NO;
   _dragOffset = 0;
   _keyboardHeight = 0;
-  _morphedOriginView.alpha = _originAlpha;
+  _morphedOriginView.hidden = NO;
+  if (_originAlpha >= 0) {
+    _morphedOriginView.alpha = _originAlpha;
+  }
+  _originAlpha = -1;
   _morphedOriginView = nil;
   [_originSnapshot removeFromSuperview];
   _originSnapshot = nil;

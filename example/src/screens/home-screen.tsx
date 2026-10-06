@@ -20,6 +20,12 @@ const EXAMPLES: IExample[] = [
     href: '/playground',
   },
   {
+    title: 'Picker',
+    subtitle: 'Chips that grow into options and fold into the new value.',
+    icon: 'checkmark.circle.fill',
+    href: '/picker',
+  },
+  {
     title: 'Game',
     subtitle: 'A game page where every button grows into a tray.',
     icon: 'crown.fill',

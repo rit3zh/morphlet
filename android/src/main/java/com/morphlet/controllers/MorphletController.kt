@@ -151,7 +151,11 @@ class MorphletController(private val reactContext: ThemedReactContext) {
   private var originColor = Color.TRANSPARENT
   private var originRadius = 0f
   private var morphedOriginReference: WeakReference<View>? = null
-  private var originAlpha = 1f
+  private var originAlpha = -1f
+  private var isOriginHidden = false
+  private var originClipBounds: Rect? = null
+  private var contentOffsetX = 0f
+  private var contentOffsetY = 0f
 
   fun setContentView(view: View?) {
     if (contentView === view) return
@@ -200,6 +204,8 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     presentationState = MorphletPresentationState.DISMISSING
     cancelAnimations()
     isMorphing = false
+    contentOffsetX = 0f
+    contentOffsetY = 0f
 
     delegate?.controllerWillDismiss(interactive)
     hideKeyboard()
@@ -389,7 +395,7 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     val windowView = window ?: return
     isMorphing = true
     morphedOriginReference = WeakReference(origin)
-    originAlpha = if (origin.alpha > 0.01f) origin.alpha else 1f
+    originAlpha = -1f
 
     val originFrame = frameOf(origin)
     originColor = MorphletSnapshot.visibleBackgroundColor(origin, resolvedCardColor())
@@ -403,7 +409,21 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     card.coverColor = originColor
     card.coverAlpha = 1f
     setGeometry(originFrame, originRadius, 0f)
-    origin.alpha = 0f
+    hideOrigin(origin)
+  }
+
+  private fun hideOrigin(origin: View) {
+    if (isOriginHidden) return
+    originClipBounds = origin.clipBounds
+    origin.clipBounds = Rect()
+    isOriginHidden = true
+  }
+
+  private fun showOrigin(origin: View) {
+    if (!isOriginHidden) return
+    origin.clipBounds = originClipBounds
+    originClipBounds = null
+    isOriginHidden = false
   }
 
   private fun morphIn() {
@@ -414,11 +434,7 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     val colors = ArgbEvaluator()
 
     animateGeometry(targetFrame(), targetRadius(), targetFullScreenAmount(), resolvedMorphSpring) { finished ->
-      if (!finished) return@animateGeometry
-      isMorphing = false
-      card.snapshot = null
-      applyFrame()
-      finishPresentingIfNeeded()
+      if (finished) endMorphIn()
     }
     trackEffect(
       MorphletSpring.start(resolvedMorphSpring, onUpdate = { progress ->
@@ -438,6 +454,28 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     )
   }
 
+  private fun endMorphIn() {
+    if (!isMorphing || presentationState != MorphletPresentationState.PRESENTING) return
+    isMorphing = false
+    window?.card?.snapshot = null
+    settleAfterMorphIn()
+    finishPresentingIfNeeded()
+  }
+
+  private fun settleAfterMorphIn() {
+    val target = targetFrame()
+    val isSettled = abs(frame.left - target.left) < 0.5f && abs(frame.top - target.top) < 0.5f &&
+      abs(frame.right - target.right) < 0.5f && abs(frame.bottom - target.bottom) < 0.5f
+    if (isSettled) {
+      applyFrame()
+      return
+    }
+    val card = window?.card
+    contentOffsetX = (frame.width() - (card?.contentWidth ?: 0)) / 2f
+    contentOffsetY = frame.height() - (card?.contentHeight ?: 0)
+    animateGeometry(target, targetRadius(), targetFullScreenAmount(), resolvedMorphSpring.withoutBounce(), null)
+  }
+
   private fun morphOut(origin: View) {
     val windowView = window ?: return
     isMorphing = true
@@ -447,10 +485,8 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     val colors = ArgbEvaluator()
     val fromBackdrop = backdrop.alpha
 
-    // Re-capture the trigger: its contents may have changed while the tray was open. Then hide it
-    // again, since a React re-render while open can have restored its opacity.
     MorphletSnapshot.recordContents(origin)?.let { originSnapshot = it }
-    origin.alpha = 0f
+    originColor = MorphletSnapshot.visibleBackgroundColor(origin, cardColor)
     card.translationY = 0f
     card.alpha = 1f
     card.snapshot = originSnapshot
@@ -481,7 +517,7 @@ class MorphletController(private val reactContext: ThemedReactContext) {
 
   private fun handOffToOrigin(origin: View) {
     if (presentationState != MorphletPresentationState.DISMISSING) return
-    origin.alpha = originAlpha
+    showOrigin(origin)
     val card = window?.card ?: return finishDismissing()
     cardSpring = MorphletSpring.start(
       MorphletSpringConfig.fromResponse(0.2f, 1f),
@@ -497,8 +533,14 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     val from = card.translationY
     val to = offscreenOffset()
     val fromBackdrop = backdrop.alpha
-    val hiddenOrigin = morphedOriginReference?.get()
+    val hiddenOrigin = morphedOriginReference?.get()?.takeIf { isOriginHidden }
     val distance = max(1f, to - from)
+    val fadeToAlpha = hiddenOrigin?.alpha ?: 1f
+    if (hiddenOrigin != null) {
+      originAlpha = fadeToAlpha
+      hiddenOrigin.alpha = 0f
+      showOrigin(hiddenOrigin)
+    }
 
     cardSpring = MorphletSpring.start(
       resolvedDismissSpring,
@@ -506,7 +548,7 @@ class MorphletController(private val reactContext: ThemedReactContext) {
       onUpdate = { progress ->
         card.translationY = lerp(from, to, progress)
         backdrop.alpha = lerp(fromBackdrop, 0f, progress).coerceIn(0f, 1f)
-        hiddenOrigin?.alpha = originAlpha * progress.coerceIn(0f, 1f)
+        hiddenOrigin?.alpha = fadeToAlpha * progress.coerceIn(0f, 1f)
       },
       onEnd = { finishDismissing() },
     )
@@ -552,8 +594,14 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     dialog = null
     window = null
 
-    morphedOriginReference?.get()?.alpha = originAlpha
+    morphedOriginReference?.get()?.let {
+      showOrigin(it)
+      if (originAlpha >= 0f) it.alpha = originAlpha
+    }
+    originAlpha = -1f
     morphedOriginReference = null
+    isOriginHidden = false
+    originClipBounds = null
     originSnapshot = null
     isMorphing = false
     dragOffset = 0f
@@ -589,7 +637,11 @@ class MorphletController(private val reactContext: ThemedReactContext) {
   }
 
   private fun applyCardGeometry(spring: MorphletSpringConfig?) {
-    if (window == null || isMorphing || presentationState == MorphletPresentationState.DISMISSING) return
+    if (window == null || presentationState == MorphletPresentationState.DISMISSING) return
+    if (isMorphing) {
+      endMorphIn()
+      return
+    }
     if (spring == null || presentationState == MorphletPresentationState.DISMISSED) {
       setGeometry(targetFrame(), targetRadius(), targetFullScreenAmount())
     } else {
@@ -603,6 +655,8 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     frame.set(target)
     radius = targetRadius
     fullScreenAmount = targetFullScreen
+    contentOffsetX = 0f
+    contentOffsetY = 0f
     applyFrame()
   }
 
@@ -617,6 +671,8 @@ class MorphletController(private val reactContext: ThemedReactContext) {
     val from = RectF(frame)
     val fromRadius = radius
     val fromFullScreen = fullScreenAmount
+    val fromOffsetX = contentOffsetX
+    val fromOffsetY = contentOffsetY
     frameSpring = MorphletSpring.start(
       spring,
       onUpdate = { progress ->
@@ -628,6 +684,8 @@ class MorphletController(private val reactContext: ThemedReactContext) {
         )
         radius = max(0f, lerp(fromRadius, targetRadius, progress))
         fullScreenAmount = lerp(fromFullScreen, targetFullScreen, progress)
+        contentOffsetX = lerp(fromOffsetX, 0f, progress)
+        contentOffsetY = lerp(fromOffsetY, 0f, progress)
         applyFrame()
       },
       onEnd = onEnd,
@@ -652,8 +710,8 @@ class MorphletController(private val reactContext: ThemedReactContext) {
       touchRoot.translationX = (frame.width() - card.contentWidth) / 2f
       touchRoot.translationY = frame.height() - card.contentHeight
     } else {
-      touchRoot.translationX = 0f
-      touchRoot.translationY = 0f
+      touchRoot.translationX = contentOffsetX
+      touchRoot.translationY = contentOffsetY
     }
   }
 

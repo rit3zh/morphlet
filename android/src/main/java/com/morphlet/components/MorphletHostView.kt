@@ -44,6 +44,7 @@ class MorphletHostView(private val reactContext: ThemedReactContext) :
   private var isOpen = false
   private var wantsPresent = false
   private var isPresentScheduled = false
+  private var isDismissScheduled = false
   private var reportedInsets: DoubleArray? = null
   private val layoutListener = ViewTreeObserver.OnGlobalLayoutListener { emitInsetsIfNeeded() }
 
@@ -78,8 +79,7 @@ class MorphletHostView(private val reactContext: ThemedReactContext) :
       schedulePresent()
     } else {
       wantsPresent = false
-      controller.originView = resolveOrigin()
-      controller.dismiss(animated = true)
+      scheduleDismiss()
     }
   }
 
@@ -103,6 +103,17 @@ class MorphletHostView(private val reactContext: ThemedReactContext) :
   fun drop() {
     controller.delegate = null
     controller.dismiss(animated = false)
+  }
+
+  private fun scheduleDismiss() {
+    if (isDismissScheduled) return
+    isDismissScheduled = true
+    post {
+      isDismissScheduled = false
+      if (isOpen) return@post
+      controller.originView = resolveOrigin()
+      controller.dismiss(animated = true)
+    }
   }
 
   private fun schedulePresent() {

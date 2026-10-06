@@ -41,6 +41,7 @@ static MorphletSpringConfig *_Nullable MorphletSpringFromProps(const SpringProps
   BOOL _open;
   BOOL _wantsPresent;
   BOOL _isPresentScheduled;
+  BOOL _isDismissScheduled;
   CGFloat _duration;
   MorphletSpringConfig *_layoutSpring;
   NSInteger _originTag;
@@ -124,8 +125,7 @@ static MorphletSpringConfig *_Nullable MorphletSpringFromProps(const SpringProps
       [self schedulePresent];
     } else {
       _wantsPresent = NO;
-      _controller.originView = [self viewForReactTag:_originTag];
-      [_controller dismissAnimated:YES];
+      [self scheduleDismiss];
     }
   }
 }
@@ -181,6 +181,27 @@ static MorphletSpringConfig *_Nullable MorphletSpringFromProps(const SpringProps
     }
     strongSelf->_isPresentScheduled = NO;
     [strongSelf presentIfNeeded];
+  });
+}
+
+- (void)scheduleDismiss {
+  if (_isDismissScheduled) {
+    return;
+  }
+  _isDismissScheduled = YES;
+
+  __weak __typeof(self) weakSelf = self;
+  dispatch_async(dispatch_get_main_queue(), ^{
+    __typeof(self) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    strongSelf->_isDismissScheduled = NO;
+    if (strongSelf->_open) {
+      return;
+    }
+    strongSelf->_controller.originView = [strongSelf viewForReactTag:strongSelf->_originTag];
+    [strongSelf->_controller dismissAnimated:YES];
   });
 }
 
