@@ -37,6 +37,12 @@ const EXAMPLES: IExample[] = [
     icon: 'folder.fill',
     href: '/collections',
   },
+  {
+    title: 'Layout freeze',
+    subtitle: 'A tray that resizes while the screen behind animates.',
+    icon: 'arrow.up.left.and.arrow.down.right',
+    href: '/layout-freeze',
+  },
 ];
 
 export default function HomeScreen() {

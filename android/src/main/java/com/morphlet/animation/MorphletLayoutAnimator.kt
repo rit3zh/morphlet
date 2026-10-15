@@ -25,6 +25,16 @@ class MorphletLayoutAnimator(private val root: ViewGroup) {
   }
 
   fun animate(config: MorphletSpringConfig): Boolean {
+    var moved = false
+    forEachDescendant(root) { view ->
+      val from = capturedFrames[view]?.takeIf { it.tag == view.id }?.frame
+      if (from == null || frameOf(view) != from) moved = true
+    }
+    if (!moved) {
+      capturedFrames.clear()
+      return false
+    }
+
     val transitions = HashMap<View, Pair<Rect, Rect>>()
     forEachDescendant(root) { view ->
       val from = capturedFrames[view]?.takeIf { it.tag == view.id }?.frame ?: return@forEachDescendant
